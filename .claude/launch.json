@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Map (Static Server)",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8080", "--directory", "docs"],
+      "port": 8080
+    },
+    {
+      "name": "Data Pipeline (fetch & geocode)",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["fetch_and_geocode.py"],
+      "port": null
+    }
+  ]
+}

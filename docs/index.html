@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Salvation Army — Property Map</title>
 
-  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -23,15 +22,123 @@
       --text:        #e2e8f0;
       --muted:       #6b839a;
       --dim:         #3a5266;
+      --header-h:    52px;
     }
 
-    /* ── Reset & layout ───────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    html, body {
+      height: 100%; font-family: system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
 
-    #app { display: flex; height: 100vh; }
+    /* ══════════════════════════════════════════════════════════════════════════
+       HEADER
+    ══════════════════════════════════════════════════════════════════════════ */
+    #header {
+      height: var(--header-h); flex-shrink: 0;
+      background: var(--sidebar-bg);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center;
+      padding: 0 14px; gap: 10px;
+      z-index: 2000;
+    }
 
-    /* ── Sidebar ──────────────────────────────────────────────────────────── */
+    /* Brand mark in header */
+    .header-brand {
+      display: flex; align-items: center; gap: 8px;
+      margin-right: 6px;
+    }
+    .header-shield {
+      width: 26px; height: 26px;
+      background: var(--sa-red); border-radius: 3px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 900; color: #fff;
+    }
+    .header-brand span {
+      font-size: .8rem; font-weight: 700; color: var(--text);
+      letter-spacing: .02em; white-space: nowrap;
+    }
+
+    .header-divider {
+      width: 1px; height: 28px; background: var(--border);
+      margin: 0 4px; flex-shrink: 0;
+    }
+
+    /* Square action buttons (left group) */
+    .action-btn {
+      width: 36px; height: 36px; flex-shrink: 0;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted); transition: border-color .15s, color .15s, background .15s;
+      position: relative;
+    }
+    .action-btn:hover { border-color: var(--sa-red); color: var(--text); background: var(--card-hover); }
+    .action-btn:active { background: var(--card-active); }
+    .action-btn svg { width: 16px; height: 16px; }
+
+    /* Tooltip */
+    .action-btn::after {
+      content: attr(data-tip);
+      position: absolute; bottom: -30px; left: 50%; transform: translateX(-50%);
+      background: #111; color: var(--text); font-size: .68rem;
+      padding: 3px 7px; border-radius: 4px; white-space: nowrap;
+      pointer-events: none; opacity: 0; transition: opacity .15s;
+      border: 1px solid var(--border);
+    }
+    .action-btn:hover::after { opacity: 1; }
+
+    /* Spinning state for refresh */
+    .action-btn.loading svg { animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast notification */
+    #toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: var(--sidebar-bg); border: 1px solid var(--sa-red);
+      color: var(--text); padding: 8px 18px; border-radius: 8px;
+      font-size: .8rem; z-index: 9999;
+      opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    #toast.show { opacity: 1; }
+
+    /* Push nav to right */
+    .header-spacer { flex: 1; }
+
+    /* Nav buttons (page switcher) */
+    .nav-group { display: flex; gap: 6px; }
+
+    .nav-btn {
+      height: 36px; padding: 0 20px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 7px; cursor: pointer;
+      display: flex; align-items: center; gap: 7px;
+      color: var(--muted); font-size: .82rem; font-weight: 600;
+      transition: border-color .15s, color .15s, background .15s;
+      white-space: nowrap;
+    }
+    .nav-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+    .nav-btn:hover { border-color: var(--sa-red-glow); color: var(--text); }
+    .nav-btn.active {
+      background: var(--sa-red); border-color: var(--sa-red);
+      color: #fff;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════════
+       VIEWS CONTAINER
+    ══════════════════════════════════════════════════════════════════════════ */
+    #views { flex: 1; overflow: hidden; display: flex; }
+
+    .view { flex: 1; display: none; overflow: hidden; }
+    .view.active { display: flex; }
+
+    /* ══════════════════════════════════════════════════════════════════════════
+       MAP VIEW
+    ══════════════════════════════════════════════════════════════════════════ */
+    #view-map { flex-direction: row; }
+
+    /* Sidebar */
     #sidebar {
       width: 320px; min-width: 280px;
       background: var(--sidebar-bg);
@@ -41,32 +148,14 @@
     }
 
     #sidebar-header {
-      padding: 0 0 12px;
+      padding: 12px 16px;
       border-bottom: 1px solid var(--border);
     }
 
-    /* Red top bar with logo area */
-    .sa-brand {
-      background: var(--sa-red);
-      padding: 12px 16px 10px;
-      display: flex; align-items: center; gap: 10px;
-      margin-bottom: 12px;
-    }
-    .sa-shield {
-      width: 28px; height: 28px; flex-shrink: 0;
-      background: white; border-radius: 3px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px; font-weight: 900; color: var(--sa-red);
-      letter-spacing: -.5px;
-    }
-    .sa-brand-text h1  { font-size: .95rem; font-weight: 700; color: #fff; letter-spacing: .02em; line-height: 1.1; }
-    .sa-brand-text p   { font-size: .65rem; color: rgba(255,255,255,.75); margin-top: 1px; letter-spacing: .06em; text-transform: uppercase; }
-
-    #last-updated { font-size: .7rem; color: var(--muted); padding: 0 16px 6px; }
+    #last-updated { font-size: .7rem; color: var(--muted); margin-bottom: 8px; }
 
     #search {
-      width: calc(100% - 32px); margin: 0 16px;
-      padding: 7px 10px; border-radius: 6px;
+      width: 100%; padding: 7px 10px; border-radius: 6px;
       border: 1px solid var(--border); background: var(--bg);
       color: var(--text); font-size: .82rem; outline: none;
       transition: border-color .15s;
@@ -74,28 +163,20 @@
     #search:focus { border-color: var(--sa-red); }
     #search::placeholder { color: var(--dim); }
 
-    /* filter chips */
     #filters {
       display: flex; flex-wrap: wrap; gap: 6px;
-      padding: 10px 16px;
-      border-bottom: 1px solid var(--border);
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
     }
-
     .chip {
       padding: 3px 10px; border-radius: 999px; font-size: .72rem;
-      border: 1px solid var(--border); background: var(--bg);
-      color: var(--muted);
+      border: 1px solid var(--border); background: var(--bg); color: var(--muted);
       cursor: pointer; transition: background .15s, border-color .15s, color .15s;
       white-space: nowrap;
     }
     .chip.active { border-color: var(--sa-red); background: var(--sa-red-dim); color: #ff8f8c; }
     .chip:hover:not(.active) { border-color: var(--sa-red-glow); }
 
-    /* property list */
-    #property-list {
-      flex: 1; overflow-y: auto;
-      padding: 8px 0;
-    }
+    #property-list { flex: 1; overflow-y: auto; padding: 8px 0; }
     #property-list::-webkit-scrollbar { width: 5px; }
     #property-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
@@ -106,36 +187,23 @@
     }
     .prop-card:hover  { background: var(--card-hover); }
     .prop-card.active { background: var(--card-active); border-left-color: var(--sa-red); }
-
     .prop-name  { font-size: .85rem; font-weight: 500; }
     .prop-meta  { font-size: .72rem; color: var(--muted); margin-top: 2px; }
     .prop-badge {
-      display: inline-block; margin-top: 4px;
-      padding: 1px 8px; border-radius: 999px;
+      display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 999px;
       font-size: .68rem; font-weight: 600; letter-spacing: .04em;
     }
 
     #count { padding: 6px 16px; font-size: .72rem; color: var(--dim); border-top: 1px solid var(--border); }
 
-    /* ── Layer panel ──────────────────────────────────────────────────────── */
-    #layer-panel {
-      padding: 10px 16px;
-      border-top: 1px solid var(--border);
-    }
+    #layer-panel { padding: 10px 16px; border-top: 1px solid var(--border); }
     #layer-panel h2 { font-size: .72rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
-
-    .layer-toggle {
-      display: flex; align-items: center; gap: 8px;
-      font-size: .8rem; padding: 4px 0; cursor: pointer;
-      color: var(--muted);
-    }
+    .layer-toggle { display: flex; align-items: center; gap: 8px; font-size: .8rem; padding: 4px 0; cursor: pointer; color: var(--muted); }
     .layer-toggle input { accent-color: var(--sa-red); cursor: pointer; }
     .layer-toggle.enabled { color: var(--text); }
 
-    /* ── Map ──────────────────────────────────────────────────────────────── */
     #map { flex: 1; }
 
-    /* ── Popup ────────────────────────────────────────────────────────────── */
     .leaflet-popup-content-wrapper {
       background: var(--sidebar-bg); color: var(--text);
       border: 1px solid var(--border); border-radius: 8px;
@@ -146,138 +214,321 @@
     .popup-row   { font-size: .78rem; color: var(--muted); margin-top: 4px; }
     .popup-row span { color: var(--text); }
 
-    /* ── Status bar ───────────────────────────────────────────────────────── */
     #statusbar {
-      position: absolute; bottom: 8px; right: 8px;
+      position: fixed; bottom: 8px; right: 8px;
       background: rgba(6,10,20,.88); backdrop-filter: blur(4px);
       border: 1px solid var(--border); border-radius: 6px;
       padding: 4px 10px; font-size: .7rem; color: var(--muted);
       z-index: 500; pointer-events: none;
     }
+
+    /* ══════════════════════════════════════════════════════════════════════════
+       DEAL VIEW
+    ══════════════════════════════════════════════════════════════════════════ */
+    #view-deals {
+      flex-direction: column;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .deals-header {
+      padding: 16px 24px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 16px; flex-shrink: 0;
+    }
+    .deals-header h2 { font-size: 1rem; font-weight: 700; }
+    .deals-header .deal-count {
+      font-size: .75rem; background: var(--sa-red-dim);
+      color: #ff8f8c; border: 1px solid var(--sa-red-glow);
+      border-radius: 999px; padding: 2px 10px;
+    }
+    .deals-search {
+      margin-left: auto;
+      padding: 6px 12px; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--sidebar-bg);
+      color: var(--text); font-size: .82rem; outline: none; width: 220px;
+      transition: border-color .15s;
+    }
+    .deals-search:focus { border-color: var(--sa-red); }
+    .deals-search::placeholder { color: var(--dim); }
+
+    .table-wrap {
+      flex: 1; overflow: auto;
+      padding: 0 24px 24px;
+    }
+    .table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+    .table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    table {
+      width: 100%; border-collapse: collapse;
+      font-size: .82rem; margin-top: 12px;
+    }
+    thead { position: sticky; top: 0; z-index: 10; }
+    th {
+      background: var(--sidebar-bg);
+      padding: 10px 14px; text-align: left;
+      font-size: .72rem; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .06em;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer; user-select: none; white-space: nowrap;
+    }
+    th:hover { color: var(--text); }
+    th .sort-arrow { margin-left: 4px; opacity: .4; font-size: .65rem; }
+    th.sorted .sort-arrow { opacity: 1; color: var(--sa-red); }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      max-width: 260px;
+    }
+    td.notes-cell {
+      color: var(--muted); font-size: .76rem;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 240px;
+    }
+
+    tbody tr { transition: background .1s; cursor: default; }
+    tbody tr:hover td { background: var(--card-hover); }
+
+    .deal-badge {
+      display: inline-block; padding: 2px 9px; border-radius: 999px;
+      font-size: .7rem; font-weight: 600; white-space: nowrap;
+    }
+    .status-badge {
+      display: inline-block; padding: 2px 9px; border-radius: 999px;
+      font-size: .7rem; font-weight: 500; white-space: nowrap;
+      background: rgba(255,255,255,.05); color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .no-deals {
+      text-align: center; padding: 60px 0; color: var(--muted); font-size: .9rem;
+    }
   </style>
 </head>
 <body>
-<div id="app">
 
-  <!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
-  <div id="sidebar">
-    <div id="sidebar-header">
-      <div class="sa-brand">
-        <div class="sa-shield">S</div>
-        <div class="sa-brand-text">
-          <h1>Salvation Army</h1>
-          <p>Property Map</p>
-        </div>
+<!-- ══════════════════════════════════════════════════════════════════════════
+     HEADER
+══════════════════════════════════════════════════════════════════════════ -->
+<div id="header">
+
+  <!-- Brand -->
+  <div class="header-brand">
+    <div class="header-shield">S</div>
+    <span>Salvation Army</span>
+  </div>
+
+  <div class="header-divider"></div>
+
+  <!-- Action buttons (square) -->
+  <button class="action-btn" id="btn-refresh" data-tip="Refresh Data">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+      <path d="M3.51 9a9 9 0 0 1 14.36-3.36L23 10M1 14l5.13 4.36A9 9 0 0 0 20.49 15"/>
+    </svg>
+  </button>
+
+  <button class="action-btn" id="btn-export" data-tip="Export CSV">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+  </button>
+
+  <button class="action-btn" id="btn-share" data-tip="Copy Share Link">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+    </svg>
+  </button>
+
+  <div class="header-spacer"></div>
+
+  <!-- Page nav buttons -->
+  <div class="nav-group">
+    <button class="nav-btn active" data-view="map">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
+        <line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+      </svg>
+      Map View
+    </button>
+    <button class="nav-btn" data-view="deals">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>
+      </svg>
+      Deal View
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     VIEWS
+══════════════════════════════════════════════════════════════════════════ -->
+<div id="views">
+
+  <!-- MAP VIEW -->
+  <div id="view-map" class="view active">
+    <div id="sidebar">
+      <div id="sidebar-header">
+        <p id="last-updated">Loading…</p>
+        <input id="search" type="text" placeholder="Search name, address, deal type…" />
       </div>
-      <p id="last-updated">Loading…</p>
-      <input id="search" type="text" placeholder="Search name, address, deal type…" />
+      <div id="filters">
+        <div class="chip active" data-type="all">All</div>
+      </div>
+      <div id="property-list"></div>
+      <div id="count"></div>
+      <div id="layer-panel">
+        <h2>Layers</h2>
+        <label class="layer-toggle enabled">
+          <input type="checkbox" checked data-layer="properties" /> Properties
+        </label>
+        <!--
+        <label class="layer-toggle">
+          <input type="checkbox" data-layer="competitors" /> Competitors
+        </label>
+        -->
+      </div>
     </div>
+    <div id="map"></div>
+  </div>
 
-    <div id="filters">
-      <div class="chip active" data-type="all">All</div>
-      <!-- deal-type chips injected dynamically -->
+  <!-- DEAL VIEW -->
+  <div id="view-deals" class="view">
+    <div class="deals-header">
+      <h2>Active Deals</h2>
+      <span class="deal-count" id="deal-count">— deals</span>
+      <input class="deals-search" id="deals-search" type="text" placeholder="Search deals…" />
     </div>
-
-    <div id="property-list"></div>
-
-    <div id="count"></div>
-
-    <!-- Future layers slot in here — uncomment and register in LAYERS below -->
-    <div id="layer-panel">
-      <h2>Layers</h2>
-      <label class="layer-toggle enabled">
-        <input type="checkbox" checked data-layer="properties" /> Properties
-      </label>
-      <!--
-      <label class="layer-toggle">
-        <input type="checkbox" data-layer="zoning" /> Zoning
-      </label>
-      <label class="layer-toggle">
-        <input type="checkbox" data-layer="demographics" /> Demographics
-      </label>
-      -->
+    <div class="table-wrap">
+      <table id="deals-table">
+        <thead>
+          <tr>
+            <th data-col="store_name">Store Name <span class="sort-arrow">↕</span></th>
+            <th data-col="full_address">Address <span class="sort-arrow">↕</span></th>
+            <th data-col="deal_type">Deal Type <span class="sort-arrow">↕</span></th>
+            <th data-col="deal_status">Deal Status <span class="sort-arrow">↕</span></th>
+            <th data-col="drumline">Drumline <span class="sort-arrow">↕</span></th>
+            <th data-col="gross_sales_rank">Sales Rank <span class="sort-arrow">↕</span></th>
+            <th data-col="deal_notes">Latest Notes <span class="sort-arrow">↕</span></th>
+          </tr>
+        </thead>
+        <tbody id="deals-tbody"></tbody>
+      </table>
     </div>
   </div>
 
-  <!-- ── Map ──────────────────────────────────────────────────────────────── -->
-  <div id="map"></div>
 </div>
 
 <div id="statusbar">Lat — &nbsp; Lng —</div>
+<div id="toast"></div>
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 const DATA_URL = "properties.json";
 
-// Deal-type → marker color. Add entries as new types appear in your sheet.
-// Any type not listed here gets the default color.
 const DEAL_COLORS = {
-  default:   "#EE2A24",   // SA red
-  // Add deal-type overrides below as needed, e.g.:
-  // "Renewal":      "#EE2A24",
-  // "Relocation":   "#ff8c00",
-  // "New Site":     "#4fde8a",
+  default: "#EE2A24",
+  // "Renewal":    "#EE2A24",
+  // "Relocation": "#ff8c00",
+  // "New Site":   "#4fde8a",
 };
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+// ── PAGE NAV ──────────────────────────────────────────────────────────────────
+document.querySelectorAll(".nav-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const target = btn.dataset.view;
+    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    document.getElementById("view-" + target).classList.add("active");
+    if (target === "map") setTimeout(() => map.invalidateSize(), 50);
+    if (target === "deals") renderDealsTable();
+  });
+});
+
+// ── HEADER ACTIONS ────────────────────────────────────────────────────────────
+document.getElementById("btn-refresh").addEventListener("click", async () => {
+  const btn = document.getElementById("btn-refresh");
+  btn.classList.add("loading");
+  await loadData();
+  btn.classList.remove("loading");
+  showToast("Data refreshed");
+});
+
+document.getElementById("btn-export").addEventListener("click", () => {
+  if (!allProperties.length) return;
+  const cols = ["site_id","store_name","full_address","deal_type","deal_status","drumline","gross_sales_rank","deal_notes","lat","lng"];
+  const header = cols.join(",");
+  const rows = allProperties.map(p =>
+    cols.map(c => `"${(p[c] ?? "").toString().replace(/"/g, '""')}"`).join(",")
+  );
+  const csv  = [header, ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement("a"), { href: url, download: "sa-properties.csv" });
+  a.click(); URL.revokeObjectURL(url);
+  showToast("CSV downloaded");
+});
+
+document.getElementById("btn-share").addEventListener("click", () => {
+  navigator.clipboard.writeText(window.location.href)
+    .then(() => showToast("Link copied to clipboard"))
+    .catch(() => showToast("Could not copy link"));
+});
 
 // ── MAP INIT ──────────────────────────────────────────────────────────────────
 const map = L.map("map", { zoomControl: true }).setView([37.5, -96], 4);
-
 L.tileLayer(
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
   { attribution: '&copy; <a href="https://www.esri.com/">Esri</a>', maxZoom: 19 }
 ).addTo(map);
 
-// Coordinate display
 map.on("mousemove", e => {
   document.getElementById("statusbar").textContent =
     `Lat ${e.latlng.lat.toFixed(5)}   Lng ${e.latlng.lng.toFixed(5)}`;
 });
 
 // ── LAYER REGISTRY ────────────────────────────────────────────────────────────
-// To add a new layer: add an entry here, add a <label> in #layer-panel above,
-// and call registerLayer() after loading your data.
 const LAYERS = {};
-
-function registerLayer(name, layerGroup) {
-  LAYERS[name] = layerGroup;
-  layerGroup.addTo(map);
-}
+function registerLayer(name, lg) { LAYERS[name] = lg; lg.addTo(map); }
 
 document.getElementById("layer-panel").addEventListener("change", e => {
-  const cb = e.target;
-  if (!cb.dataset.layer) return;
-  const layer = LAYERS[cb.dataset.layer];
-  if (!layer) return;
+  const cb = e.target; if (!cb.dataset.layer) return;
+  const layer = LAYERS[cb.dataset.layer]; if (!layer) return;
   cb.checked ? layer.addTo(map) : map.removeLayer(layer);
   cb.closest(".layer-toggle").classList.toggle("enabled", cb.checked);
 });
 
 // ── MARKER HELPERS ────────────────────────────────────────────────────────────
-function colorForType(type) {
-  return DEAL_COLORS[type] || DEAL_COLORS.default;
-}
+function colorForType(type) { return DEAL_COLORS[type] || DEAL_COLORS.default; }
 
 function makeIcon(color) {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32">
-      <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z"
-            fill="${color}" stroke="rgba(0,0,0,.4)" stroke-width="1.5"/>
-      <circle cx="12" cy="12" r="5" fill="white" opacity=".9"/>
-    </svg>`;
-  return L.divIcon({
-    html: svg, className: "", iconSize: [24, 32], iconAnchor: [12, 32], popupAnchor: [0, -34],
-  });
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32">
+    <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z"
+          fill="${color}" stroke="rgba(0,0,0,.4)" stroke-width="1.5"/>
+    <circle cx="12" cy="12" r="5" fill="white" opacity=".9"/></svg>`;
+  return L.divIcon({ html: svg, className: "", iconSize: [24,32], iconAnchor: [12,32], popupAnchor: [0,-34] });
 }
 
-// ── SIDEBAR HELPERS ───────────────────────────────────────────────────────────
-let allProperties = [];
-let activeType    = "all";
-let activeCard    = null;
-let markerMap     = {};   // site_id → marker
+// ── SIDEBAR ───────────────────────────────────────────────────────────────────
+let allProperties = [], activeType = "all", markerMap = {};
 
 function badge(type) {
-  const color = colorForType(type);
-  return `<span class="prop-badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${type || "—"}</span>`;
+  const c = colorForType(type);
+  return `<span class="prop-badge" style="background:${c}22;color:${c};border:1px solid ${c}44">${type||"—"}</span>`;
 }
 
 function renderList(props) {
@@ -285,132 +536,176 @@ function renderList(props) {
   list.innerHTML = "";
   props.forEach(p => {
     const card = document.createElement("div");
-    card.className = "prop-card";
-    card.dataset.id = p.site_id;
+    card.className = "prop-card"; card.dataset.id = p.site_id;
     card.innerHTML = `
-      <div class="prop-name">${p.store_name || "Unnamed"}</div>
-      <div class="prop-meta">${p.full_address || ""}</div>
-      <div class="prop-meta">Sales Rank: ${p.gross_sales_rank || "—"}</div>
+      <div class="prop-name">${p.store_name||"Unnamed"}</div>
+      <div class="prop-meta">${p.full_address||""}</div>
+      <div class="prop-meta">Sales Rank: ${p.gross_sales_rank||"—"}</div>
       ${badge(p.deal_type)}`;
     card.addEventListener("click", () => selectProperty(p.site_id));
     list.appendChild(card);
   });
-  document.getElementById("count").textContent = `${props.length} propert${props.length === 1 ? "y" : "ies"}`;
+  document.getElementById("count").textContent =
+    `${props.length} propert${props.length===1?"y":"ies"}`;
 }
 
 function selectProperty(id) {
-  // Highlight card
   document.querySelectorAll(".prop-card").forEach(c => c.classList.remove("active"));
   const card = document.querySelector(`.prop-card[data-id="${id}"]`);
-  if (card) {
-    card.classList.add("active");
-    card.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }
-  // Fly to marker
+  if (card) { card.classList.add("active"); card.scrollIntoView({ block:"nearest", behavior:"smooth" }); }
   const marker = markerMap[id];
-  if (marker) {
-    map.flyTo(marker.getLatLng(), 14, { duration: 0.8 });
-    marker.openPopup();
-  }
-  activeCard = id;
+  if (marker) { map.flyTo(marker.getLatLng(), 14, { duration: .8 }); marker.openPopup(); }
 }
 
 function filteredProperties() {
   const q = document.getElementById("search").value.toLowerCase();
   return allProperties.filter(p => {
     const matchType = activeType === "all" || p.deal_type === activeType;
-    const matchQ    = !q || [p.store_name, p.site_id, p.deal_type]
-      .some(v => (v || "").toLowerCase().includes(q));
+    const matchQ = !q || [p.store_name, p.full_address, p.deal_type]
+      .some(v => (v||"").toLowerCase().includes(q));
     return matchType && matchQ;
   });
 }
 
-function refresh() { renderList(filteredProperties()); }
+function refreshSidebar() { renderList(filteredProperties()); }
 
-// ── FILTER CHIPS ──────────────────────────────────────────────────────────────
 function buildChips(properties) {
-  const types    = [...new Set(properties.map(p => p.deal_type).filter(Boolean))].sort();
+  const types = [...new Set(properties.map(p => p.deal_type).filter(Boolean))].sort();
   const container = document.getElementById("filters");
   types.forEach(t => {
     const chip = document.createElement("div");
-    chip.className = "chip";
-    chip.dataset.type = t;
-    chip.textContent  = t;
-    const color = colorForType(t);
-    chip.addEventListener("mouseenter", () => { if (!chip.classList.contains("active")) chip.style.borderColor = color; });
-    chip.addEventListener("mouseleave", () => { if (!chip.classList.contains("active")) chip.style.borderColor = ""; });
+    chip.className = "chip"; chip.dataset.type = t; chip.textContent = t;
     container.appendChild(chip);
   });
-
   container.addEventListener("click", e => {
-    const chip = e.target.closest(".chip");
-    if (!chip) return;
+    const chip = e.target.closest(".chip"); if (!chip) return;
     activeType = chip.dataset.type;
     container.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
     chip.classList.add("active");
-    refresh();
+    refreshSidebar();
   });
 }
 
-// ── SEARCH ────────────────────────────────────────────────────────────────────
-document.getElementById("search").addEventListener("input", refresh);
+document.getElementById("search").addEventListener("input", refreshSidebar);
+
+// ── DEAL VIEW TABLE ───────────────────────────────────────────────────────────
+let dealSortCol = "store_name", dealSortAsc = true, dealSearchQ = "";
+
+function activeDeals() {
+  return allProperties.filter(p => p.deal_type && p.deal_type.trim() !== "");
+}
+
+function renderDealsTable() {
+  const q = dealSearchQ.toLowerCase();
+  let rows = activeDeals().filter(p =>
+    !q || [p.store_name, p.full_address, p.deal_type, p.deal_status, p.deal_notes]
+      .some(v => (v||"").toLowerCase().includes(q))
+  );
+
+  rows.sort((a, b) => {
+    const va = (a[dealSortCol] ?? "").toString().toLowerCase();
+    const vb = (b[dealSortCol] ?? "").toString().toLowerCase();
+    const num_a = parseFloat(va), num_b = parseFloat(vb);
+    const cmp = (!isNaN(num_a) && !isNaN(num_b))
+      ? num_a - num_b
+      : va.localeCompare(vb);
+    return dealSortAsc ? cmp : -cmp;
+  });
+
+  document.getElementById("deal-count").textContent = `${rows.length} deal${rows.length!==1?"s":""}`;
+
+  const tbody = document.getElementById("deals-tbody");
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="no-deals">No active deals found</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(p => {
+    const color = colorForType(p.deal_type);
+    return `<tr>
+      <td><strong>${p.store_name||"—"}</strong></td>
+      <td>${p.full_address||"—"}</td>
+      <td><span class="deal-badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${p.deal_type||"—"}</span></td>
+      <td><span class="status-badge">${p.deal_status||"—"}</span></td>
+      <td>${p.drumline||"—"}</td>
+      <td>${p.gross_sales_rank||"—"}</td>
+      <td class="notes-cell" title="${(p.deal_notes||"").replace(/"/g,"&quot;")}">${p.deal_notes||"—"}</td>
+    </tr>`;
+  }).join("");
+
+  // Update sort arrows
+  document.querySelectorAll("#deals-table th").forEach(th => {
+    th.classList.toggle("sorted", th.dataset.col === dealSortCol);
+    const arrow = th.querySelector(".sort-arrow");
+    if (th.dataset.col === dealSortCol) {
+      arrow.textContent = dealSortAsc ? "↑" : "↓";
+    } else {
+      arrow.textContent = "↕";
+    }
+  });
+}
+
+// Sort on header click
+document.querySelectorAll("#deals-table th").forEach(th => {
+  th.addEventListener("click", () => {
+    if (dealSortCol === th.dataset.col) dealSortAsc = !dealSortAsc;
+    else { dealSortCol = th.dataset.col; dealSortAsc = true; }
+    renderDealsTable();
+  });
+});
+
+document.getElementById("deals-search").addEventListener("input", e => {
+  dealSearchQ = e.target.value;
+  renderDealsTable();
+});
 
 // ── LOAD DATA ─────────────────────────────────────────────────────────────────
 async function loadData() {
   try {
-    const resp = await fetch(DATA_URL);
+    const resp = await fetch(DATA_URL + "?t=" + Date.now());
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const properties = await resp.json();
-
     allProperties = properties;
 
     document.getElementById("last-updated").textContent =
-      `Updated ${new Date(document.lastModified || Date.now()).toLocaleDateString()}`;
+      `Updated ${new Date().toLocaleDateString()}`;
 
-    // Build marker layer
-    const markerLayer = L.layerGroup();
+    // Rebuild map markers
+    if (LAYERS.properties) { map.removeLayer(LAYERS.properties); delete LAYERS.properties; }
     markerMap = {};
+    const markerLayer = L.layerGroup();
 
     properties.forEach(p => {
       if (!p.lat || !p.lng) return;
-      const color  = colorForType(p.deal_type);
+      const color = colorForType(p.deal_type);
       const marker = L.marker([p.lat, p.lng], { icon: makeIcon(color) });
-
       marker.bindPopup(`
-        <div class="popup-title">${p.store_name || "Unnamed"}</div>
-        <div class="popup-row">Address &nbsp;<span>${p.full_address || "—"}</span></div>
-        <div class="popup-row">Deal Type &nbsp;<span>${p.deal_type || "—"}</span></div>
-        <div class="popup-row">Drumline &nbsp;<span>${p.drumline || "—"}</span></div>
-        <div class="popup-row">Deal Notes &nbsp;<span>${p.deal_notes || "—"}</span></div>
+        <div class="popup-title">${p.store_name||"Unnamed"}</div>
+        <div class="popup-row">Address &nbsp;<span>${p.full_address||"—"}</span></div>
+        <div class="popup-row">Deal Type &nbsp;<span>${p.deal_type||"—"}</span></div>
+        <div class="popup-row">Drumline &nbsp;<span>${p.drumline||"—"}</span></div>
+        <div class="popup-row">Deal Notes &nbsp;<span>${p.deal_notes||"—"}</span></div>
       `);
-
       marker.on("click", () => {
         document.querySelectorAll(".prop-card").forEach(c => c.classList.remove("active"));
         const card = document.querySelector(`.prop-card[data-id="${p.site_id}"]`);
-        if (card) {
-          card.classList.add("active");
-          card.scrollIntoView({ block: "nearest", behavior: "smooth" });
-        }
+        if (card) { card.classList.add("active"); card.scrollIntoView({ block:"nearest", behavior:"smooth" }); }
       });
-
       markerLayer.addLayer(marker);
       markerMap[p.site_id] = marker;
     });
 
     registerLayer("properties", markerLayer);
     buildChips(properties);
-    renderList(properties);
+    refreshSidebar();
 
-    // Fit map to markers if we have any
     const coords = properties.filter(p => p.lat && p.lng).map(p => [p.lat, p.lng]);
     if (coords.length) map.fitBounds(coords, { padding: [40, 40] });
 
   } catch (err) {
-    console.error("Failed to load properties.json:", err);
+    console.error("Failed to load data:", err);
     document.getElementById("property-list").innerHTML =
-      `<div style="padding:16px;color:#f77c6c;font-size:.8rem">
-        Failed to load data.<br><small>${err.message}</small>
-      </div>`;
+      `<div style="padding:16px;color:#f77c6c;font-size:.8rem">Failed to load data.<br><small>${err.message}</small></div>`;
   }
 }
 

@@ -16,6 +16,7 @@ COLUMN_MAP = {
     "zip":              "Zip",
     "drumline":         "Drumline",
     "gross_sales_rank": "Gross Sales Rank",
+    "deal_status":      "Deal Status",
     "deal_notes":       "Latest Comment",
 }
 
