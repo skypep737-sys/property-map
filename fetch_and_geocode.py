@@ -20,8 +20,32 @@ COLUMN_MAP = {
     "deal_notes":       "Latest Comment",
 }
 
-CACHE_FILE  = "geocode_cache.json"
-OUTPUT_FILE = "docs/properties.json"
+CACHE_FILE    = "geocode_cache.json"
+OUTPUT_FILE   = "docs/properties.json"
+SURVEY_OUTPUT = "docs/surveys.json"
+
+# Survey sheet column headers — must match your Smartsheet exactly.
+SURVEY_COLUMN_MAP = {
+    "survey_order":   "Survey Order",
+    "rank":           "Rank",
+    "street":         "Address",
+    "city":           "City",
+    "state":          "State",
+    "zip":            "Zip",
+    "submarket":      "Submarket",
+    "available_sqft": "Available SQFT",
+    "base_rent":      "Base Rent",
+    "opx":            "Opx",
+    "site_notes":     "Site Notes",
+    "as_built":       "As-Built (former Use)",
+    "photo_link":     "Photo Link",
+    "flyer_link":     "Flyer Link",
+    "broker":         "Broker",
+    "broker_email":   "Broker Email",
+    "phone":          "Phone",
+    "lng":            "Long",
+    "lat":            "Lat",
+}
 
 # ── SMARTSHEET ────────────────────────────────────────────────────────────────
 
@@ -53,6 +77,42 @@ def parse_rows(sheet):
                 record[field] = str(cell.get("value") or "").strip()
         if record.get("site_id"):          # skip rows with no Site ID
             rows.append(record)
+    return rows
+
+
+# ── SURVEYS ───────────────────────────────────────────────────────────────────
+
+def fetch_survey_sheet():
+    token    = os.environ["SMARTSHEET_TOKEN"]
+    sheet_id = os.environ["SURVEY_SHEET_ID"]
+    resp = requests.get(
+        f"https://api.smartsheet.com/2.0/sheets/{sheet_id}",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def parse_survey_rows(sheet):
+    col_id_to_name = {c["id"]: c["title"] for c in sheet["columns"]}
+    reverse = {v: k for k, v in SURVEY_COLUMN_MAP.items()}
+
+    rows = []
+    for row in sheet.get("rows", []):
+        record = {}
+        for cell in row.get("cells", []):
+            header = col_id_to_name.get(cell.get("columnId"), "")
+            field  = reverse.get(header)
+            if field:
+                record[field] = str(cell.get("value") or "").strip()
+        # Skip rows with no survey order or Red rank
+        if not record.get("survey_order"):
+            continue
+        if record.get("rank", "").strip().lower() == "red":
+            print(f"  Skipping Red-ranked site: {record.get('street', '')}")
+            continue
+        rows.append(record)
     return rows
 
 
@@ -148,6 +208,27 @@ def main():
     with open(OUTPUT_FILE, "w") as f:
         json.dump(valid, f, indent=2)
     print(f"Wrote {OUTPUT_FILE}.")
+
+    # ── Surveys (only runs if SURVEY_SHEET_ID secret is set) ──────────────────
+    survey_sheet_id = os.environ.get("SURVEY_SHEET_ID", "").strip()
+    if survey_sheet_id:
+        print("Fetching survey sheet…")
+        survey_sheet = fetch_survey_sheet()
+        survey_rows  = parse_survey_rows(survey_sheet)
+        # Keep only rows with valid coordinates
+        valid_surveys = [
+            r for r in survey_rows
+            if r.get("lat") and r.get("lng")
+            and r["lat"] not in ("", "None") and r["lng"] not in ("", "None")
+        ]
+        print(f"  {len(valid_surveys)} survey sites with coordinates (Red-ranked excluded).")
+        with open(SURVEY_OUTPUT, "w") as f:
+            json.dump(valid_surveys, f, indent=2)
+        print(f"Wrote {SURVEY_OUTPUT}.")
+    else:
+        print("SURVEY_SHEET_ID not set — writing empty surveys.json.")
+        with open(SURVEY_OUTPUT, "w") as f:
+            json.dump([], f)
 
 
 if __name__ == "__main__":

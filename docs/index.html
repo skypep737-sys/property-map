@@ -196,6 +196,59 @@
 
     #count { padding: 6px 16px; font-size: .72rem; color: var(--dim); border-top: 1px solid var(--border); }
 
+    /* ── Survey sidebar section ──────────────────────────────────────────────── */
+    #survey-section {
+      display: none;
+      flex-direction: column;
+      border-top: 2px solid #22c55e33;
+      max-height: 260px;
+      flex-shrink: 0;
+    }
+    #survey-section.visible { display: flex; }
+
+    .survey-section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 16px 4px; flex-shrink: 0;
+    }
+    .survey-section-header span:first-child {
+      font-size: .72rem; font-weight: 600; color: #22c55e;
+      text-transform: uppercase; letter-spacing: .08em;
+    }
+    #survey-count { font-size: .7rem; color: var(--dim); }
+
+    #survey-list { overflow-y: auto; flex: 1; }
+    #survey-list::-webkit-scrollbar { width: 5px; }
+    #survey-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .survey-card { padding: 8px 16px; cursor: pointer; border-left: 3px solid transparent; transition: background .1s, border-color .1s; }
+    .survey-card:hover  { background: var(--card-hover); }
+    .survey-card.active { background: #0a1a0a; border-left-color: #22c55e; }
+
+    .survey-num {
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .7rem; font-weight: 700; flex-shrink: 0;
+      background: var(--bg);
+    }
+
+    /* Survey popup photo */
+    .survey-photo {
+      width: 100%; max-height: 130px; object-fit: cover;
+      border-radius: 5px; margin-bottom: 7px; display: block;
+    }
+    .survey-photo-link {
+      display: none; font-size: .75rem; color: var(--sa-red);
+      text-decoration: none; margin-bottom: 7px;
+    }
+    .popup-flyer-link {
+      display: inline-block; margin-top: 6px;
+      padding: 4px 12px; border-radius: 5px;
+      background: var(--sa-red-dim); color: var(--sa-red);
+      border: 1px solid var(--sa-red-glow);
+      font-size: .75rem; font-weight: 600; text-decoration: none;
+    }
+    .popup-flyer-link:hover { background: var(--sa-red); color: #fff; }
+
     #layer-panel { padding: 10px 16px; border-top: 1px solid var(--border); }
     #layer-panel h2 { font-size: .72rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
     .layer-toggle { display: flex; align-items: center; gap: 8px; font-size: .8rem; padding: 4px 0; cursor: pointer; color: var(--muted); }
@@ -382,10 +435,23 @@
       </div>
       <div id="property-list"></div>
       <div id="count"></div>
+
+      <!-- Survey sites sidebar section -->
+      <div id="survey-section">
+        <div class="survey-section-header">
+          <span>&#9679; Survey Sites</span>
+          <span id="survey-count"></span>
+        </div>
+        <div id="survey-list"></div>
+      </div>
+
       <div id="layer-panel">
         <h2>Layers</h2>
         <label class="layer-toggle enabled">
           <input type="checkbox" checked data-layer="properties" /> Properties
+        </label>
+        <label class="layer-toggle">
+          <input type="checkbox" data-layer="surveys" /> Survey Sites
         </label>
         <!--
         <label class="layer-toggle">
@@ -464,6 +530,7 @@ document.getElementById("btn-refresh").addEventListener("click", async () => {
   const btn = document.getElementById("btn-refresh");
   btn.classList.add("loading");
   await loadData();
+  await loadSurveys();
   btn.classList.remove("loading");
   showToast("Data refreshed");
 });
@@ -507,9 +574,13 @@ function registerLayer(name, lg) { LAYERS[name] = lg; lg.addTo(map); }
 
 document.getElementById("layer-panel").addEventListener("change", e => {
   const cb = e.target; if (!cb.dataset.layer) return;
-  const layer = LAYERS[cb.dataset.layer]; if (!layer) return;
-  cb.checked ? layer.addTo(map) : map.removeLayer(layer);
+  const layer = LAYERS[cb.dataset.layer];
+  if (layer) { cb.checked ? layer.addTo(map) : map.removeLayer(layer); }
   cb.closest(".layer-toggle").classList.toggle("enabled", cb.checked);
+  // Show/hide survey sidebar section
+  if (cb.dataset.layer === "surveys") {
+    document.getElementById("survey-section").classList.toggle("visible", cb.checked);
+  }
 });
 
 // ── MARKER HELPERS ────────────────────────────────────────────────────────────
@@ -659,6 +730,110 @@ document.getElementById("deals-search").addEventListener("input", e => {
   renderDealsTable();
 });
 
+// ── SURVEY LAYER ─────────────────────────────────────────────────────────────
+const RANK_COLORS = { green: "#22c55e", yellow: "#f59e0b" };
+function rankColor(rank) { return RANK_COLORS[(rank||"").toLowerCase()] || "#94a3b8"; }
+
+function makeSurveyIcon(order, rank) {
+  const ring = rankColor(rank);
+  const num  = String(order || "?");
+  const fs   = num.length > 2 ? 9 : 12;
+  const svg  = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+    <circle cx="16" cy="16" r="14" fill="#0b1120" stroke="${ring}" stroke-width="3"/>
+    <text x="16" y="21" text-anchor="middle" font-size="${fs}" font-weight="700"
+          fill="white" font-family="system-ui,sans-serif">${num}</text>
+  </svg>`;
+  return L.divIcon({ html: svg, className: "", iconSize: [32,32], iconAnchor: [16,16], popupAnchor: [0,-20] });
+}
+
+let surveyMarkerMap = {};
+
+function renderSurveyList(surveys) {
+  const list = document.getElementById("survey-list");
+  list.innerHTML = "";
+  surveys.forEach(s => {
+    const ring = rankColor(s.rank);
+    const card = document.createElement("div");
+    card.className = "survey-card"; card.dataset.id = s.survey_order;
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="survey-num" style="border:2px solid ${ring};color:${ring}">${s.survey_order}</span>
+        <div>
+          <div class="prop-name">${s.street||""}, ${s.city||""}</div>
+          <div class="prop-meta">${s.available_sqft ? s.available_sqft+" SF" : ""}${s.available_sqft && s.base_rent ? " · " : ""}${s.base_rent ? "$"+s.base_rent+"/SF" : ""}</div>
+        </div>
+      </div>`;
+    card.addEventListener("click", () => selectSurvey(s.survey_order));
+    list.appendChild(card);
+  });
+  document.getElementById("survey-count").textContent =
+    `${surveys.length} site${surveys.length !== 1 ? "s" : ""}`;
+}
+
+function selectSurvey(order) {
+  document.querySelectorAll(".survey-card").forEach(c => c.classList.remove("active"));
+  const card = document.querySelector(`.survey-card[data-id="${order}"]`);
+  if (card) { card.classList.add("active"); card.scrollIntoView({ block:"nearest", behavior:"smooth" }); }
+  const marker = surveyMarkerMap[order];
+  if (marker) { map.flyTo(marker.getLatLng(), 15, { duration: .8 }); marker.openPopup(); }
+}
+
+async function loadSurveys() {
+  try {
+    const resp = await fetch("surveys.json?t=" + Date.now());
+    if (!resp.ok) return;
+    const surveys = await resp.json();
+    if (!surveys.length) return;
+
+    if (LAYERS.surveys) { map.removeLayer(LAYERS.surveys); delete LAYERS.surveys; }
+    surveyMarkerMap = {};
+    const surveyLayer = L.layerGroup();
+
+    surveys.forEach(s => {
+      const lat = parseFloat(s.lat), lng = parseFloat(s.lng);
+      if (isNaN(lat) || isNaN(lng)) return;
+
+      const marker = L.marker([lat, lng], { icon: makeSurveyIcon(s.survey_order, s.rank) });
+
+      // Build popup HTML
+      const photoId = `sph-${s.survey_order}`;
+      const photoHtml = s.photo_link ? `
+        <img class="survey-photo" src="${s.photo_link}"
+             onerror="this.style.display='none';document.getElementById('${photoId}').style.display='block'"/>
+        <a id="${photoId}" class="survey-photo-link" href="${s.photo_link}" target="_blank">📷 View Photo</a>` : "";
+      const flyerHtml = s.flyer_link
+        ? `<a class="popup-flyer-link" href="${s.flyer_link}" target="_blank">📄 View Flyer</a>` : "";
+
+      marker.bindPopup(`
+        <div class="popup-title">#${s.survey_order} · ${s.street||""}, ${s.city||""}</div>
+        ${photoHtml}
+        <div class="popup-row">Available SF &nbsp;<span>${s.available_sqft||"—"}</span></div>
+        <div class="popup-row">Base Rent &nbsp;<span>${s.base_rent ? "$"+s.base_rent+"/SF" : "—"}</span></div>
+        ${flyerHtml}
+        ${s.broker ? `<div class="popup-row" style="margin-top:6px">Broker &nbsp;<span>${s.broker}</span></div>` : ""}
+      `, { maxWidth: 280 });
+
+      marker.on("click", () => {
+        document.querySelectorAll(".survey-card").forEach(c => c.classList.remove("active"));
+        const card = document.querySelector(`.survey-card[data-id="${s.survey_order}"]`);
+        if (card) { card.classList.add("active"); card.scrollIntoView({ block:"nearest", behavior:"smooth" }); }
+      });
+
+      surveyLayer.addLayer(marker);
+      surveyMarkerMap[s.survey_order] = marker;
+    });
+
+    LAYERS.surveys = surveyLayer;
+    // Add to map only if the toggle is checked
+    const cb = document.querySelector('[data-layer="surveys"]');
+    if (cb && cb.checked) surveyLayer.addTo(map);
+
+    renderSurveyList(surveys);
+  } catch (err) {
+    console.log("No survey data:", err.message);
+  }
+}
+
 // ── LOAD DATA ─────────────────────────────────────────────────────────────────
 async function loadData() {
   try {
@@ -710,6 +885,7 @@ async function loadData() {
 }
 
 loadData();
+loadSurveys();
 </script>
 </body>
 </html>
