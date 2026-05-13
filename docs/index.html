@@ -390,20 +390,23 @@
       text-align: center; padding: 60px 0; color: var(--muted); font-size: .9rem;
     }
 
-    /* Survey Review sub-view toggle button */
+    /* Survey Review nav button */
     .survey-review-btn {
-      height: 32px; padding: 0 14px;
+      height: 36px; padding: 0 20px;
       background: var(--bg); border: 1px solid var(--border);
-      border-radius: 6px; cursor: pointer;
-      color: var(--muted); font-size: .78rem; font-weight: 600;
+      border-radius: 7px; cursor: pointer;
+      display: flex; align-items: center; gap: 7px;
+      color: var(--muted); font-size: .82rem; font-weight: 600;
       transition: border-color .15s, color .15s, background .15s;
       white-space: nowrap; flex-shrink: 0;
     }
     .survey-review-btn:hover { border-color: #22c55e66; color: #22c55e; }
     .survey-review-btn.active {
-      background: rgba(34,197,94,.12); border-color: #22c55e;
+      background: rgba(34,197,94,.15); border-color: #22c55e;
       color: #22c55e;
     }
+    .survey-review-btn { display: none; }
+    .survey-review-btn.visible { display: flex; }
 
     /* Survey review table */
     #survey-review-wrap {
@@ -549,6 +552,7 @@
       </svg>
       Deal View
     </button>
+    <button class="survey-review-btn" id="btn-survey-review">&#9679; Survey Review</button>
   </div>
 </div>
 
@@ -607,7 +611,6 @@
     <div class="deals-header">
       <h2>Active Deals</h2>
       <span class="deal-count" id="deal-count">— deals</span>
-      <button class="survey-review-btn" id="btn-survey-review">&#9679; Survey Review</button>
       <input class="deals-search" id="deals-search" type="text" placeholder="Search deals…" />
     </div>
     <div class="deals-filter-row" id="deals-filters">
@@ -716,8 +719,20 @@ document.querySelectorAll(".nav-btn").forEach(btn => {
     btn.classList.add("active");
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
     document.getElementById("view-" + target).classList.add("active");
+
+    const srBtn = document.getElementById("btn-survey-review");
+    if (target === "deals") {
+      srBtn.classList.add("visible");
+      renderDealsTable();
+    } else {
+      // Reset survey review when leaving Deal View
+      srBtn.classList.remove("visible", "active");
+      surveyReviewActive = false;
+      document.getElementById("deals-filters").style.display = "";
+      document.getElementById("deals-table-wrap").style.display = "";
+      document.getElementById("survey-review-wrap").classList.remove("active");
+    }
     if (target === "map") setTimeout(() => map.invalidateSize(), 50);
-    if (target === "deals") renderDealsTable();
   });
 });
 
