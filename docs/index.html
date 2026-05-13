@@ -313,6 +313,29 @@
     .deals-search:focus { border-color: var(--sa-red); }
     .deals-search::placeholder { color: var(--dim); }
 
+    .deals-filter-row {
+      display: flex; gap: 8px; align-items: center;
+      padding: 8px 24px 10px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .deal-chip {
+      padding: 3px 12px; border-radius: 999px; font-size: .75rem;
+      border: 1px solid var(--border); background: var(--bg);
+      color: var(--muted); cursor: pointer;
+      transition: background .15s, border-color .15s, color .15s;
+      white-space: nowrap;
+    }
+    .deal-chip.active {
+      border-color: var(--chip-color, var(--sa-red));
+      background: color-mix(in srgb, var(--chip-color, var(--sa-red)) 15%, transparent);
+      color: var(--chip-color, var(--sa-red));
+    }
+    .deal-chip:hover:not(.active) {
+      border-color: var(--chip-color, var(--sa-red));
+      color: var(--chip-color, var(--sa-red));
+    }
+
     .table-wrap {
       flex: 1; overflow: auto;
       padding: 0 24px 24px;
@@ -483,6 +506,11 @@
       <span class="deal-count" id="deal-count">— deals</span>
       <input class="deals-search" id="deals-search" type="text" placeholder="Search deals…" />
     </div>
+    <div class="deals-filter-row" id="deals-filters">
+      <div class="deal-chip active" data-deal-type="all">All</div>
+      <div class="deal-chip" data-deal-type="Renewal" style="--chip-color:#f97316">&#9679; Renewal</div>
+      <div class="deal-chip" data-deal-type="Newlo"   style="--chip-color:#eab308">&#9679; Newlo</div>
+    </div>
     <div class="table-wrap">
       <table id="deals-table">
         <thead>
@@ -511,10 +539,9 @@
 const DATA_URL = "properties.json";
 
 const DEAL_COLORS = {
-  default: "#EE2A24",
-  // "Renewal":    "#EE2A24",
-  // "Relocation": "#ff8c00",
-  // "New Site":   "#4fde8a",
+  default:   "#EE2A24",   // SA red
+  "Renewal": "#f97316",   // orange
+  "Newlo":   "#eab308",   // yellow
 };
 
 // ── TOAST ─────────────────────────────────────────────────────────────────────
@@ -688,18 +715,29 @@ function buildChips(properties) {
 document.getElementById("search").addEventListener("input", refreshSidebar);
 
 // ── DEAL VIEW TABLE ───────────────────────────────────────────────────────────
-let dealSortCol = "store_name", dealSortAsc = true, dealSearchQ = "";
+let dealSortCol = "store_name", dealSortAsc = true, dealSearchQ = "", dealTypeFilter = "all";
 
 function activeDeals() {
   return allProperties.filter(p => p.deal_type && p.deal_type.trim() !== "");
 }
 
+// Deal type filter chips
+document.getElementById("deals-filters").addEventListener("click", e => {
+  const chip = e.target.closest(".deal-chip"); if (!chip) return;
+  dealTypeFilter = chip.dataset.dealType;
+  document.querySelectorAll(".deal-chip").forEach(c => c.classList.remove("active"));
+  chip.classList.add("active");
+  renderDealsTable();
+});
+
 function renderDealsTable() {
   const q = dealSearchQ.toLowerCase();
-  let rows = activeDeals().filter(p =>
-    !q || [p.store_name, p.full_address, p.deal_type, p.deal_status, p.deal_notes]
-      .some(v => (v||"").toLowerCase().includes(q))
-  );
+  let rows = activeDeals().filter(p => {
+    const matchType = dealTypeFilter === "all" || (p.deal_type||"").trim() === dealTypeFilter;
+    const matchQ = !q || [p.store_name, p.full_address, p.deal_type, p.deal_status, p.deal_notes]
+      .some(v => (v||"").toLowerCase().includes(q));
+    return matchType && matchQ;
+  });
 
   rows.sort((a, b) => {
     const va = (a[dealSortCol] ?? "").toString().toLowerCase();
