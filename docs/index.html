@@ -176,6 +176,9 @@
     }
     .chip.active { border-color: var(--sa-red); background: var(--sa-red-dim); color: #ff8f8c; }
     .chip:hover:not(.active) { border-color: var(--sa-red-glow); }
+    .survey-chip { border-color: #22c55e44; color: #22c55e99; }
+    .survey-chip.active { border-color: #22c55e; background: rgba(34,197,94,.15); color: #22c55e; }
+    .survey-chip:hover:not(.active) { border-color: #22c55e66; color: #22c55e; }
 
     #property-list { flex: 1; overflow-y: auto; padding: 8px 0; }
     #property-list::-webkit-scrollbar { width: 5px; }
@@ -201,7 +204,7 @@
     #survey-section {
       display: none;
       flex-direction: column;
-      border-top: 2px solid #22c55e33;
+      border-bottom: 2px solid #22c55e33;
       max-height: 260px;
       flex-shrink: 0;
     }
@@ -433,11 +436,11 @@
       </div>
       <div id="filters">
         <div class="chip active" data-type="all">All</div>
+        <!-- deal-type chips injected dynamically -->
+        <div class="chip survey-chip" id="chip-survey" data-layer="surveys">&#9679; Site Survey</div>
       </div>
-      <div id="property-list"></div>
-      <div id="count"></div>
 
-      <!-- Survey sites sidebar section -->
+      <!-- Survey sites — shown at top when chip is active -->
       <div id="survey-section">
         <div class="survey-section-header">
           <span>&#9679; Survey Sites</span>
@@ -445,6 +448,9 @@
         </div>
         <div id="survey-list"></div>
       </div>
+
+      <div id="property-list"></div>
+      <div id="count"></div>
 
       <div id="layer-panel">
         <h2>Layers</h2>
@@ -573,14 +579,29 @@ map.on("mousemove", e => {
 const LAYERS = {};
 function registerLayer(name, lg) { LAYERS[name] = lg; lg.addTo(map); }
 
+function toggleSurveyLayer(on) {
+  const layer = LAYERS.surveys;
+  if (layer) { on ? layer.addTo(map) : map.removeLayer(layer); }
+  document.getElementById("survey-section").classList.toggle("visible", on);
+  // Keep chip and checkbox in sync
+  document.getElementById("chip-survey").classList.toggle("active", on);
+  const cb = document.querySelector('[data-layer="surveys"]');
+  if (cb) { cb.checked = on; cb.closest(".layer-toggle").classList.toggle("enabled", on); }
+}
+
+document.getElementById("chip-survey").addEventListener("click", () => {
+  const isOn = document.getElementById("chip-survey").classList.contains("active");
+  toggleSurveyLayer(!isOn);
+});
+
 document.getElementById("layer-panel").addEventListener("change", e => {
   const cb = e.target; if (!cb.dataset.layer) return;
-  const layer = LAYERS[cb.dataset.layer];
-  if (layer) { cb.checked ? layer.addTo(map) : map.removeLayer(layer); }
-  cb.closest(".layer-toggle").classList.toggle("enabled", cb.checked);
-  // Show/hide survey sidebar section
   if (cb.dataset.layer === "surveys") {
-    document.getElementById("survey-section").classList.toggle("visible", cb.checked);
+    toggleSurveyLayer(cb.checked);
+  } else {
+    const layer = LAYERS[cb.dataset.layer];
+    if (layer) { cb.checked ? layer.addTo(map) : map.removeLayer(layer); }
+    cb.closest(".layer-toggle").classList.toggle("enabled", cb.checked);
   }
 });
 
