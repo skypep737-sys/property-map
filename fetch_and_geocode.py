@@ -6,13 +6,17 @@ import requests
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 # Update these to exactly match your Smartsheet column headers.
 COLUMN_MAP = {
-    "site_id":    "SITE ID",
-    "store_name": "Store Name",
-    "deal_type":  "Deal Type",
-    "street":     "Address",
-    "city":       "City",
-    "state":      "State",
-    "zip":        "Zip",
+    "site_id":          "SITE ID",
+    "store_name":       "Store Name",
+    "deal_type":        "Deal Type",
+    "full_address":     "Full Address",
+    "street":           "Address",
+    "city":             "City",
+    "state":            "State",
+    "zip":              "Zip",
+    "drumline":         "Drumline",
+    "gross_sales_rank": "Gross Sales Rank",
+    "deal_notes":       "Latest Comment",
 }
 
 CACHE_FILE  = "geocode_cache.json"
