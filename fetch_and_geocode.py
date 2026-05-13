@@ -82,9 +82,8 @@ def parse_rows(sheet):
 
 # ── SURVEYS ───────────────────────────────────────────────────────────────────
 
-def fetch_survey_sheet():
-    token    = os.environ["SMARTSHEET_TOKEN"]
-    sheet_id = os.environ["SURVEY_SHEET_ID"]
+def fetch_survey_sheet_by_id(sheet_id):
+    token = os.environ["SMARTSHEET_TOKEN"]
     resp = requests.get(
         f"https://api.smartsheet.com/2.0/sheets/{sheet_id}",
         headers={"Authorization": f"Bearer {token}"},
@@ -209,49 +208,60 @@ def main():
         json.dump(valid, f, indent=2)
     print(f"Wrote {OUTPUT_FILE}.")
 
-    # ── Surveys (only runs if SURVEY_SHEET_ID secret is set) ──────────────────
-    survey_sheet_id = os.environ.get("SURVEY_SHEET_ID", "").strip()
-    if survey_sheet_id:
-        print("Fetching survey sheet…")
-        survey_sheet = fetch_survey_sheet()
-        survey_rows  = parse_survey_rows(survey_sheet)
-        print(f"  {len(survey_rows)} survey rows (Red-ranked excluded).")
+    # ── Surveys — supports comma-separated sheet IDs in SURVEY_SHEET_ID ─────────
+    survey_ids_raw = os.environ.get("SURVEY_SHEET_ID", "").strip()
+    if survey_ids_raw:
+        survey_ids = [s.strip() for s in survey_ids_raw.split(",") if s.strip()]
+        all_surveys_out = {}
 
-        # Geocode any rows missing lat/lng (survey sheet has no coord columns)
-        print("Geocoding survey addresses…")
-        for row in survey_rows:
-            lat = row.get("lat", "").strip()
-            lng = row.get("lng", "").strip()
-            if lat and lng and lat not in ("", "None") and lng not in ("", "None"):
-                continue  # already has coords
-            key = cache_key(row)
-            if key in cache:
-                row["lat"], row["lng"] = cache[key]
-            else:
-                print(f"  Geocoding survey: {row.get('street')}, {row.get('city')}")
-                glat, glng = geocode_address(
-                    row.get("street", ""), row.get("city", ""),
-                    row.get("state", ""),  row.get("zip", ""),
-                )
-                cache[key] = [glat, glng]
-                row["lat"], row["lng"] = glat, glng
-                time.sleep(0.3)
+        for sid in survey_ids:
+            print(f"Fetching survey sheet {sid}…")
+            try:
+                ssheet = fetch_survey_sheet_by_id(sid)
+                sheet_name = ssheet.get("name", f"Survey {sid}")
+                print(f"  Sheet name: {sheet_name!r}")
+                srows = parse_survey_rows(ssheet)
+                print(f"  {len(srows)} rows (Red-ranked excluded).")
+
+                print("  Geocoding…")
+                for row in srows:
+                    lat = row.get("lat", "").strip()
+                    lng = row.get("lng", "").strip()
+                    if lat and lng and lat not in ("", "None") and lng not in ("", "None"):
+                        continue
+                    key = cache_key(row)
+                    if key in cache:
+                        row["lat"], row["lng"] = cache[key]
+                    else:
+                        print(f"    Geocoding: {row.get('street')}, {row.get('city')}")
+                        glat, glng = geocode_address(
+                            row.get("street", ""), row.get("city", ""),
+                            row.get("state", ""),  row.get("zip", ""),
+                        )
+                        cache[key] = [glat, glng]
+                        row["lat"], row["lng"] = glat, glng
+                        time.sleep(0.3)
+
+                valid = [
+                    r for r in srows
+                    if r.get("lat") and r.get("lng")
+                    and str(r["lat"]) not in ("", "None")
+                    and str(r["lng"]) not in ("", "None")
+                ]
+                print(f"  {len(valid)} sites with valid coordinates.")
+                all_surveys_out[sheet_name] = valid
+
+            except Exception as e:
+                print(f"  Error fetching sheet {sid}: {e}")
 
         save_cache(cache)
-
-        valid_surveys = [
-            r for r in survey_rows
-            if r.get("lat") and r.get("lng")
-            and str(r["lat"]) not in ("", "None") and str(r["lng"]) not in ("", "None")
-        ]
-        print(f"  {len(valid_surveys)} survey sites with valid coordinates.")
         with open(SURVEY_OUTPUT, "w") as f:
-            json.dump(valid_surveys, f, indent=2)
+            json.dump(all_surveys_out, f, indent=2)
         print(f"Wrote {SURVEY_OUTPUT}.")
     else:
         print("SURVEY_SHEET_ID not set — writing empty surveys.json.")
         with open(SURVEY_OUTPUT, "w") as f:
-            json.dump([], f)
+            json.dump({}, f)
 
 
 if __name__ == "__main__":
