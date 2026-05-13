@@ -389,6 +389,109 @@
     .no-deals {
       text-align: center; padding: 60px 0; color: var(--muted); font-size: .9rem;
     }
+
+    /* Survey Review sub-view toggle button */
+    .survey-review-btn {
+      height: 32px; padding: 0 14px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; cursor: pointer;
+      color: var(--muted); font-size: .78rem; font-weight: 600;
+      transition: border-color .15s, color .15s, background .15s;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .survey-review-btn:hover { border-color: #22c55e66; color: #22c55e; }
+    .survey-review-btn.active {
+      background: rgba(34,197,94,.12); border-color: #22c55e;
+      color: #22c55e;
+    }
+
+    /* Survey review table */
+    #survey-review-wrap {
+      flex: 1; overflow: auto;
+      padding: 0 24px 24px;
+      display: none;
+    }
+    #survey-review-wrap.active { display: block; }
+    #survey-review-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+    #survey-review-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .survey-addr-link {
+      color: var(--sa-red); cursor: pointer; text-decoration: underline;
+      text-underline-offset: 2px; font-weight: 500;
+    }
+    .survey-addr-link:hover { color: #ff8f8c; }
+
+    .rank-badge {
+      display: inline-block; padding: 2px 9px; border-radius: 999px;
+      font-size: .7rem; font-weight: 600; white-space: nowrap;
+    }
+
+    /* ── Survey detail modal ─────────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 9000;
+      background: rgba(0,0,0,.7); backdrop-filter: blur(3px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+    .modal-card {
+      background: var(--sidebar-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%; max-width: 500px;
+      max-height: 88vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,.8);
+      transform: translateY(12px); transition: transform .2s;
+      position: relative;
+    }
+    .modal-overlay.open .modal-card { transform: translateY(0); }
+
+    .modal-close {
+      position: absolute; top: 12px; right: 14px;
+      background: none; border: none; color: var(--muted);
+      font-size: 1.3rem; cursor: pointer; line-height: 1;
+      transition: color .15s;
+    }
+    .modal-close:hover { color: var(--text); }
+
+    .modal-photo {
+      width: 100%; max-height: 220px; object-fit: cover;
+      border-radius: 12px 12px 0 0; display: block;
+    }
+    .modal-photo-placeholder { display: none; }
+
+    .modal-body { padding: 18px 20px 20px; }
+
+    .modal-title {
+      font-size: 1rem; font-weight: 700; color: #fff;
+      margin-bottom: 14px; padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      padding-right: 24px; /* room for close btn */
+    }
+
+    .modal-field { margin-bottom: 10px; }
+    .modal-label {
+      font-size: .7rem; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .06em;
+      margin-bottom: 2px;
+    }
+    .modal-value { font-size: .85rem; color: var(--text); }
+    .modal-value.notes { white-space: pre-wrap; line-height: 1.5; color: var(--muted); }
+
+    .modal-flyer-btn {
+      display: inline-block; margin-top: 14px;
+      padding: 8px 20px; border-radius: 7px;
+      background: var(--sa-red); color: #fff;
+      border: none; font-size: .82rem; font-weight: 600;
+      cursor: pointer; text-decoration: none;
+      transition: background .15s, transform .1s;
+    }
+    .modal-flyer-btn:hover { background: #c91f1a; transform: translateY(-1px); }
+    .modal-flyer-btn.disabled {
+      background: var(--border); color: var(--muted); pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -504,6 +607,7 @@
     <div class="deals-header">
       <h2>Active Deals</h2>
       <span class="deal-count" id="deal-count">— deals</span>
+      <button class="survey-review-btn" id="btn-survey-review">&#9679; Survey Review</button>
       <input class="deals-search" id="deals-search" type="text" placeholder="Search deals…" />
     </div>
     <div class="deals-filter-row" id="deals-filters">
@@ -511,7 +615,7 @@
       <div class="deal-chip" data-deal-type="Renewal" style="--chip-color:#f97316">&#9679; Renewal</div>
       <div class="deal-chip" data-deal-type="Newlo"   style="--chip-color:#eab308">&#9679; Newlo</div>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap" id="deals-table-wrap">
       <table id="deals-table">
         <thead>
           <tr>
@@ -526,6 +630,58 @@
         </thead>
         <tbody id="deals-tbody"></tbody>
       </table>
+    </div>
+
+    <!-- Survey Review sub-view -->
+    <div id="survey-review-wrap">
+      <table id="survey-review-table">
+        <thead>
+          <tr>
+            <th data-scol="survey_order"># <span class="sort-arrow">↕</span></th>
+            <th data-scol="street">Address <span class="sort-arrow">↕</span></th>
+            <th data-scol="submarket">Submarket <span class="sort-arrow">↕</span></th>
+            <th data-scol="available_sqft">Avail. SF <span class="sort-arrow">↕</span></th>
+            <th data-scol="base_rent">Base Rent <span class="sort-arrow">↕</span></th>
+            <th data-scol="as_built">As-Built <span class="sort-arrow">↕</span></th>
+            <th data-scol="rank">Rank <span class="sort-arrow">↕</span></th>
+          </tr>
+        </thead>
+        <tbody id="survey-review-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Survey detail modal -->
+  <div class="modal-overlay" id="survey-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="survey-modal-close">&times;</button>
+      <img class="modal-photo" id="modal-photo" src="" alt="Site photo" />
+      <div class="modal-body">
+        <div class="modal-title" id="modal-title"></div>
+        <div class="modal-field">
+          <div class="modal-label">Address</div>
+          <div class="modal-value" id="modal-address"></div>
+        </div>
+        <div style="display:flex;gap:20px">
+          <div class="modal-field" style="flex:1">
+            <div class="modal-label">Available SQFT</div>
+            <div class="modal-value" id="modal-sqft"></div>
+          </div>
+          <div class="modal-field" style="flex:1">
+            <div class="modal-label">Base Rent</div>
+            <div class="modal-value" id="modal-rent"></div>
+          </div>
+        </div>
+        <div class="modal-field">
+          <div class="modal-label">As-Built (Former Use)</div>
+          <div class="modal-value" id="modal-asbuilt"></div>
+        </div>
+        <div class="modal-field">
+          <div class="modal-label">Site Notes</div>
+          <div class="modal-value notes" id="modal-notes"></div>
+        </div>
+        <a class="modal-flyer-btn" id="modal-flyer-btn" href="#" target="_blank">📄 View Flyer</a>
+      </div>
     </div>
   </div>
 
@@ -714,6 +870,151 @@ function buildChips(properties) {
 
 document.getElementById("search").addEventListener("input", refreshSidebar);
 
+// ── SURVEY REVIEW TOGGLE ──────────────────────────────────────────────────────
+let surveyReviewActive = false;
+
+document.getElementById("btn-survey-review").addEventListener("click", () => {
+  surveyReviewActive = !surveyReviewActive;
+  const btn = document.getElementById("btn-survey-review");
+  const filterRow = document.getElementById("deals-filters");
+  const dealsWrap = document.getElementById("deals-table-wrap");
+  const surveyWrap = document.getElementById("survey-review-wrap");
+  const countBadge = document.getElementById("deal-count");
+
+  btn.classList.toggle("active", surveyReviewActive);
+
+  if (surveyReviewActive) {
+    filterRow.style.display = "none";
+    dealsWrap.style.display = "none";
+    surveyWrap.classList.add("active");
+    renderSurveyReviewTable();
+  } else {
+    filterRow.style.display = "";
+    dealsWrap.style.display = "";
+    surveyWrap.classList.remove("active");
+    renderDealsTable();
+  }
+});
+
+// ── SURVEY DETAIL MODAL ───────────────────────────────────────────────────────
+function openSurveyModal(s) {
+  const modal = document.getElementById("survey-modal");
+  const photo = document.getElementById("modal-photo");
+
+  // Photo
+  if (s.photo_link) {
+    photo.src = s.photo_link;
+    photo.style.display = "block";
+    photo.onerror = () => { photo.style.display = "none"; };
+  } else {
+    photo.style.display = "none";
+    photo.src = "";
+  }
+
+  // Fields
+  document.getElementById("modal-title").textContent =
+    `#${surveyNum(s.survey_order)} · ${s.street || ""}${s.city ? ", " + s.city : ""}`;
+  document.getElementById("modal-address").textContent =
+    [s.street, s.city, s.state, s.zip].filter(Boolean).join(", ") || "—";
+  document.getElementById("modal-sqft").textContent =
+    s.available_sqft ? s.available_sqft + " SF" : "—";
+  document.getElementById("modal-rent").textContent =
+    s.base_rent ? "$" + s.base_rent + "/SF" : "—";
+  document.getElementById("modal-asbuilt").textContent = s.as_built || "—";
+  document.getElementById("modal-notes").textContent = s.site_notes || "—";
+
+  // Flyer button
+  const flyerBtn = document.getElementById("modal-flyer-btn");
+  if (s.flyer_link) {
+    flyerBtn.href = s.flyer_link;
+    flyerBtn.classList.remove("disabled");
+  } else {
+    flyerBtn.href = "#";
+    flyerBtn.classList.add("disabled");
+    flyerBtn.onclick = e => e.preventDefault();
+  }
+
+  modal.classList.add("open");
+}
+
+document.getElementById("survey-modal-close").addEventListener("click", () => {
+  document.getElementById("survey-modal").classList.remove("open");
+});
+document.getElementById("survey-modal").addEventListener("click", e => {
+  if (e.target === e.currentTarget)
+    document.getElementById("survey-modal").classList.remove("open");
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") document.getElementById("survey-modal").classList.remove("open");
+});
+
+// ── SURVEY REVIEW TABLE ───────────────────────────────────────────────────────
+let allSurveys = [];
+let surveySortCol = "survey_order", surveySortAsc = true;
+
+function renderSurveyReviewTable() {
+  const countBadge = document.getElementById("deal-count");
+  let rows = [...allSurveys];
+
+  rows.sort((a, b) => {
+    const va = (a[surveySortCol] ?? "").toString().toLowerCase();
+    const vb = (b[surveySortCol] ?? "").toString().toLowerCase();
+    const na = parseFloat(va), nb = parseFloat(vb);
+    const cmp = (!isNaN(na) && !isNaN(nb)) ? na - nb : va.localeCompare(vb);
+    return surveySortAsc ? cmp : -cmp;
+  });
+
+  countBadge.textContent = `${rows.length} site${rows.length !== 1 ? "s" : ""}`;
+
+  const tbody = document.getElementById("survey-review-tbody");
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="no-deals">No survey data available</td></tr>`;
+  } else {
+    tbody.innerHTML = rows.map(s => {
+      const ring = rankColor(s.rank);
+      const rankLabel = s.rank || "—";
+      return `<tr data-survey-order="${s.survey_order}" style="cursor:pointer">
+        <td><span class="survey-num" style="border:2px solid ${ring};color:${ring};display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-size:.72rem;font-weight:700">${surveyNum(s.survey_order)}</span></td>
+        <td><span class="survey-addr-link" data-survey-order="${s.survey_order}">${s.street || "—"}${s.city ? ", " + s.city : ""}</span></td>
+        <td>${s.submarket || "—"}</td>
+        <td>${s.available_sqft ? s.available_sqft + " SF" : "—"}</td>
+        <td>${s.base_rent ? "$" + s.base_rent + "/SF" : "—"}</td>
+        <td>${s.as_built || "—"}</td>
+        <td><span class="rank-badge" style="background:${ring}22;color:${ring};border:1px solid ${ring}44">${rankLabel}</span></td>
+      </tr>`;
+    }).join("");
+
+    // Row click → open modal
+    tbody.querySelectorAll("tr[data-survey-order]").forEach(tr => {
+      tr.addEventListener("click", () => {
+        const order = tr.dataset.surveyOrder;
+        const s = allSurveys.find(x => String(x.survey_order) === String(order));
+        if (s) openSurveyModal(s);
+      });
+    });
+  }
+
+  // Update sort arrows
+  document.querySelectorAll("#survey-review-table th").forEach(th => {
+    th.classList.toggle("sorted", th.dataset.scol === surveySortCol);
+    const arrow = th.querySelector(".sort-arrow");
+    if (th.dataset.scol === surveySortCol) {
+      arrow.textContent = surveySortAsc ? "↑" : "↓";
+    } else {
+      arrow.textContent = "↕";
+    }
+  });
+}
+
+// Sort on survey table header click
+document.querySelectorAll("#survey-review-table th").forEach(th => {
+  th.addEventListener("click", () => {
+    if (surveySortCol === th.dataset.scol) surveySortAsc = !surveySortAsc;
+    else { surveySortCol = th.dataset.scol; surveySortAsc = true; }
+    if (surveyReviewActive) renderSurveyReviewTable();
+  });
+});
+
 // ── DEAL VIEW TABLE ───────────────────────────────────────────────────────────
 let dealSortCol = "store_name", dealSortAsc = true, dealSearchQ = "", dealTypeFilter = "all";
 
@@ -855,6 +1156,7 @@ async function loadSurveys() {
     if (!resp.ok) return;
     const surveys = await resp.json();
     if (!surveys.length) return;
+    allSurveys = surveys;
 
     if (LAYERS.surveys) { map.removeLayer(LAYERS.surveys); delete LAYERS.surveys; }
     surveyMarkerMap = {};
