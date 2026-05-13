@@ -26,9 +26,9 @@ jobs:
 
       - name: Fetch & geocode
         env:
-          SMARTSHEET_TOKEN:    ${{ secrets.SMARTSHEET_TOKEN }}
+          SMARTSHEET_TOKEN:    ${{ secrets.SMARTSHEET }}
           SMARTSHEET_SHEET_ID: ${{ secrets.SMARTSHEET_SHEET_ID }}
-          SURVEY_SHEET_ID:     ${{ secrets.SURVEY_SHEET_ID }}
+          SURVEY_SHEET_ID:     ${{ secrets.SURVEY }}
         run: python fetch_and_geocode.py
 
       - name: Commit updated data
