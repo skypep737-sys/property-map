@@ -215,13 +215,36 @@ def main():
         print("Fetching survey sheet…")
         survey_sheet = fetch_survey_sheet()
         survey_rows  = parse_survey_rows(survey_sheet)
-        # Keep only rows with valid coordinates
+        print(f"  {len(survey_rows)} survey rows (Red-ranked excluded).")
+
+        # Geocode any rows missing lat/lng (survey sheet has no coord columns)
+        print("Geocoding survey addresses…")
+        for row in survey_rows:
+            lat = row.get("lat", "").strip()
+            lng = row.get("lng", "").strip()
+            if lat and lng and lat not in ("", "None") and lng not in ("", "None"):
+                continue  # already has coords
+            key = cache_key(row)
+            if key in cache:
+                row["lat"], row["lng"] = cache[key]
+            else:
+                print(f"  Geocoding survey: {row.get('street')}, {row.get('city')}")
+                glat, glng = geocode_address(
+                    row.get("street", ""), row.get("city", ""),
+                    row.get("state", ""),  row.get("zip", ""),
+                )
+                cache[key] = [glat, glng]
+                row["lat"], row["lng"] = glat, glng
+                time.sleep(0.3)
+
+        save_cache(cache)
+
         valid_surveys = [
             r for r in survey_rows
             if r.get("lat") and r.get("lng")
-            and r["lat"] not in ("", "None") and r["lng"] not in ("", "None")
+            and str(r["lat"]) not in ("", "None") and str(r["lng"]) not in ("", "None")
         ]
-        print(f"  {len(valid_surveys)} survey sites with coordinates (Red-ranked excluded).")
+        print(f"  {len(valid_surveys)} survey sites with valid coordinates.")
         with open(SURVEY_OUTPUT, "w") as f:
             json.dump(valid_surveys, f, indent=2)
         print(f"Wrote {SURVEY_OUTPUT}.")
