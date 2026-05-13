@@ -93,6 +93,21 @@ def fetch_survey_sheet_by_id(sheet_id):
     return resp.json()
 
 
+def fetch_folder_sheet_ids(folder_id):
+    """Return list of numeric sheet IDs for every sheet inside a Smartsheet folder."""
+    token = os.environ["SMARTSHEET_TOKEN"]
+    resp = requests.get(
+        f"https://api.smartsheet.com/2.0/folders/{folder_id}",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    sheets = data.get("sheets", [])
+    print(f"  Folder '{data.get('name', folder_id)}' contains {len(sheets)} sheet(s).")
+    return [str(s["id"]) for s in sheets]
+
+
 def parse_survey_rows(sheet):
     col_id_to_name = {c["id"]: c["title"] for c in sheet["columns"]}
     reverse = {v: k for k, v in SURVEY_COLUMN_MAP.items()}
@@ -208,10 +223,21 @@ def main():
         json.dump(valid, f, indent=2)
     print(f"Wrote {OUTPUT_FILE}.")
 
-    # ── Surveys — supports comma-separated sheet IDs in SURVEY_SHEET_ID ─────────
+    # ── Surveys ───────────────────────────────────────────────────────────────
+    # Priority: SURVEY_FOLDER_ID (auto-discovers all sheets in that folder)
+    #           → SURVEY_SHEET_ID (comma-separated explicit IDs, legacy fallback)
+    folder_id     = os.environ.get("SURVEY_FOLDER_ID", "").strip()
     survey_ids_raw = os.environ.get("SURVEY_SHEET_ID", "").strip()
-    if survey_ids_raw:
+
+    if folder_id:
+        print(f"Discovering survey sheets from folder {folder_id}…")
+        survey_ids = fetch_folder_sheet_ids(folder_id)
+    elif survey_ids_raw:
         survey_ids = [s.strip() for s in survey_ids_raw.split(",") if s.strip()]
+    else:
+        survey_ids = []
+
+    if survey_ids:
         all_surveys_out = {}
 
         for sid in survey_ids:
@@ -259,7 +285,7 @@ def main():
             json.dump(all_surveys_out, f, indent=2)
         print(f"Wrote {SURVEY_OUTPUT}.")
     else:
-        print("SURVEY_SHEET_ID not set — writing empty surveys.json.")
+        print("No survey source configured — writing empty surveys.json.")
         with open(SURVEY_OUTPUT, "w") as f:
             json.dump({}, f)
 

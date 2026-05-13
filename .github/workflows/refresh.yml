@@ -28,6 +28,10 @@ jobs:
         env:
           SMARTSHEET_TOKEN:    ${{ secrets.SMARTSHEET }}
           SMARTSHEET_SHEET_ID: ${{ secrets.SMARTSHEET_SHEET_ID }}
+          # Folder-based survey discovery (preferred): add/remove sheets from
+          # the Smartsheet folder to control what appears on the web page.
+          SURVEY_FOLDER_ID:    ${{ secrets.SURVEY_FOLDER_ID }}
+          # Legacy fallback: comma-separated sheet IDs (used if SURVEY_FOLDER_ID not set)
           SURVEY_SHEET_ID:     ${{ secrets.SURVEY }}
         run: python fetch_and_geocode.py
 
