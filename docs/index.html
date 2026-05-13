@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Property Map</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    /* ── Reset & layout ───────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: system-ui, sans-serif; background: #0f1117; color: #e2e8f0; }
+
+    #app { display: flex; height: 100vh; }
+
+    /* ── Sidebar ──────────────────────────────────────────────────────────── */
+    #sidebar {
+      width: 320px; min-width: 280px;
+      background: #1a1d27;
+      display: flex; flex-direction: column;
+      border-right: 1px solid #2d3148;
+      z-index: 1000;
+    }
+
+    #sidebar-header {
+      padding: 18px 16px 12px;
+      border-bottom: 1px solid #2d3148;
+    }
+
+    #sidebar-header h1 { font-size: 1rem; font-weight: 600; letter-spacing: .02em; }
+    #sidebar-header p  { font-size: .72rem; color: #7c85a2; margin-top: 2px; }
+
+    #search {
+      width: 100%; margin-top: 10px;
+      padding: 7px 10px; border-radius: 6px;
+      border: 1px solid #2d3148; background: #0f1117;
+      color: #e2e8f0; font-size: .82rem; outline: none;
+    }
+    #search::placeholder { color: #4a5270; }
+
+    /* filter chips */
+    #filters {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 10px 16px;
+      border-bottom: 1px solid #2d3148;
+    }
+
+    .chip {
+      padding: 3px 10px; border-radius: 999px; font-size: .72rem;
+      border: 1px solid #2d3148; background: #0f1117;
+      cursor: pointer; transition: background .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .chip.active { border-color: #6c8cf7; background: #1e2a50; color: #9ab4ff; }
+
+    /* property list */
+    #property-list {
+      flex: 1; overflow-y: auto;
+      padding: 8px 0;
+    }
+    #property-list::-webkit-scrollbar { width: 5px; }
+    #property-list::-webkit-scrollbar-thumb { background: #2d3148; border-radius: 3px; }
+
+    .prop-card {
+      padding: 10px 16px; cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: background .1s, border-color .1s;
+    }
+    .prop-card:hover   { background: #1e2232; }
+    .prop-card.active  { background: #1e2a50; border-left-color: #6c8cf7; }
+
+    .prop-name    { font-size: .85rem; font-weight: 500; }
+    .prop-meta    { font-size: .72rem; color: #7c85a2; margin-top: 2px; }
+    .prop-badge   {
+      display: inline-block; margin-top: 4px;
+      padding: 1px 8px; border-radius: 999px;
+      font-size: .68rem; font-weight: 600; letter-spacing: .04em;
+    }
+
+    #count { padding: 6px 16px; font-size: .72rem; color: #4a5270; border-top: 1px solid #2d3148; }
+
+    /* ── Layer panel (future layers slot in here) ─────────────────────────── */
+    #layer-panel {
+      padding: 10px 16px;
+      border-top: 1px solid #2d3148;
+    }
+    #layer-panel h2 { font-size: .72rem; font-weight: 600; color: #7c85a2; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+
+    .layer-toggle {
+      display: flex; align-items: center; gap: 8px;
+      font-size: .8rem; padding: 4px 0; cursor: pointer;
+      color: #7c85a2;
+    }
+    .layer-toggle input { accent-color: #6c8cf7; cursor: pointer; }
+    .layer-toggle.enabled { color: #e2e8f0; }
+
+    /* ── Map ──────────────────────────────────────────────────────────────── */
+    #map { flex: 1; }
+
+    /* ── Popup ────────────────────────────────────────────────────────────── */
+    .leaflet-popup-content-wrapper {
+      background: #1a1d27; color: #e2e8f0;
+      border: 1px solid #2d3148; border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.5);
+    }
+    .leaflet-popup-tip { background: #1a1d27; }
+    .popup-title  { font-weight: 600; font-size: .9rem; margin-bottom: 4px; }
+    .popup-row    { font-size: .78rem; color: #7c85a2; margin-top: 2px; }
+    .popup-row span { color: #e2e8f0; }
+
+    /* ── Status bar ───────────────────────────────────────────────────────── */
+    #statusbar {
+      position: absolute; bottom: 8px; right: 8px;
+      background: rgba(15,17,23,.85); backdrop-filter: blur(4px);
+      border: 1px solid #2d3148; border-radius: 6px;
+      padding: 4px 10px; font-size: .7rem; color: #7c85a2;
+      z-index: 500; pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <h1>Property Map</h1>
+      <p id="last-updated">Loading…</p>
+      <input id="search" type="text" placeholder="Search name, ID, deal type…" />
+    </div>
+
+    <div id="filters">
+      <div class="chip active" data-type="all">All</div>
+      <!-- deal-type chips injected dynamically -->
+    </div>
+
+    <div id="property-list"></div>
+
+    <div id="count"></div>
+
+    <!-- Future layers slot in here — uncomment and register in LAYERS below -->
+    <div id="layer-panel">
+      <h2>Layers</h2>
+      <label class="layer-toggle enabled">
+        <input type="checkbox" checked data-layer="properties" /> Properties
+      </label>
+      <!--
+      <label class="layer-toggle">
+        <input type="checkbox" data-layer="zoning" /> Zoning
+      </label>
+      <label class="layer-toggle">
+        <input type="checkbox" data-layer="demographics" /> Demographics
+      </label>
+      -->
+    </div>
+  </div>
+
+  <!-- ── Map ──────────────────────────────────────────────────────────────── -->
+  <div id="map"></div>
+</div>
+
+<div id="statusbar">Lat — &nbsp; Lng —</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const DATA_URL = "properties.json";
+
+// Deal-type → marker color. Add entries as new types appear in your sheet.
+// Any type not listed here gets the default color.
+const DEAL_COLORS = {
+  default: "#6c8cf7",
+  // "NNN":  "#f7c948",
+  // "Ground Lease": "#4fde8a",
+  // "Lease": "#f77c6c",
+};
+
+// ── MAP INIT ──────────────────────────────────────────────────────────────────
+const map = L.map("map", { zoomControl: true }).setView([37.5, -96], 4);
+
+L.tileLayer(
+  "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+  { attribution: '&copy; <a href="https://carto.com/">CARTO</a>', maxZoom: 19 }
+).addTo(map);
+
+// Coordinate display
+map.on("mousemove", e => {
+  document.getElementById("statusbar").textContent =
+    `Lat ${e.latlng.lat.toFixed(5)}   Lng ${e.latlng.lng.toFixed(5)}`;
+});
+
+// ── LAYER REGISTRY ────────────────────────────────────────────────────────────
+// To add a new layer: add an entry here, add a <label> in #layer-panel above,
+// and call registerLayer() after loading your data.
+const LAYERS = {};
+
+function registerLayer(name, layerGroup) {
+  LAYERS[name] = layerGroup;
+  layerGroup.addTo(map);
+}
+
+document.getElementById("layer-panel").addEventListener("change", e => {
+  const cb = e.target;
+  if (!cb.dataset.layer) return;
+  const layer = LAYERS[cb.dataset.layer];
+  if (!layer) return;
+  cb.checked ? layer.addTo(map) : map.removeLayer(layer);
+  cb.closest(".layer-toggle").classList.toggle("enabled", cb.checked);
+});
+
+// ── MARKER HELPERS ────────────────────────────────────────────────────────────
+function colorForType(type) {
+  return DEAL_COLORS[type] || DEAL_COLORS.default;
+}
+
+function makeIcon(color) {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32">
+      <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z"
+            fill="${color}" stroke="rgba(0,0,0,.4)" stroke-width="1.5"/>
+      <circle cx="12" cy="12" r="5" fill="white" opacity=".9"/>
+    </svg>`;
+  return L.divIcon({
+    html: svg, className: "", iconSize: [24, 32], iconAnchor: [12, 32], popupAnchor: [0, -34],
+  });
+}
+
+// ── SIDEBAR HELPERS ───────────────────────────────────────────────────────────
+let allProperties = [];
+let activeType    = "all";
+let activeCard    = null;
+let markerMap     = {};   // site_id → marker
+
+function badge(type) {
+  const color = colorForType(type);
+  return `<span class="prop-badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${type || "—"}</span>`;
+}
+
+function renderList(props) {
+  const list = document.getElementById("property-list");
+  list.innerHTML = "";
+  props.forEach(p => {
+    const card = document.createElement("div");
+    card.className = "prop-card";
+    card.dataset.id = p.site_id;
+    card.innerHTML = `
+      <div class="prop-name">${p.store_name || "Unnamed"}</div>
+      <div class="prop-meta">ID: ${p.site_id}</div>
+      ${badge(p.deal_type)}`;
+    card.addEventListener("click", () => selectProperty(p.site_id));
+    list.appendChild(card);
+  });
+  document.getElementById("count").textContent = `${props.length} propert${props.length === 1 ? "y" : "ies"}`;
+}
+
+function selectProperty(id) {
+  // Highlight card
+  document.querySelectorAll(".prop-card").forEach(c => c.classList.remove("active"));
+  const card = document.querySelector(`.prop-card[data-id="${id}"]`);
+  if (card) {
+    card.classList.add("active");
+    card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+  // Fly to marker
+  const marker = markerMap[id];
+  if (marker) {
+    map.flyTo(marker.getLatLng(), 14, { duration: 0.8 });
+    marker.openPopup();
+  }
+  activeCard = id;
+}
+
+function filteredProperties() {
+  const q = document.getElementById("search").value.toLowerCase();
+  return allProperties.filter(p => {
+    const matchType = activeType === "all" || p.deal_type === activeType;
+    const matchQ    = !q || [p.store_name, p.site_id, p.deal_type]
+      .some(v => (v || "").toLowerCase().includes(q));
+    return matchType && matchQ;
+  });
+}
+
+function refresh() { renderList(filteredProperties()); }
+
+// ── FILTER CHIPS ──────────────────────────────────────────────────────────────
+function buildChips(properties) {
+  const types    = [...new Set(properties.map(p => p.deal_type).filter(Boolean))].sort();
+  const container = document.getElementById("filters");
+  types.forEach(t => {
+    const chip = document.createElement("div");
+    chip.className = "chip";
+    chip.dataset.type = t;
+    chip.textContent  = t;
+    const color = colorForType(t);
+    chip.addEventListener("mouseenter", () => { if (!chip.classList.contains("active")) chip.style.borderColor = color; });
+    chip.addEventListener("mouseleave", () => { if (!chip.classList.contains("active")) chip.style.borderColor = ""; });
+    container.appendChild(chip);
+  });
+
+  container.addEventListener("click", e => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    activeType = chip.dataset.type;
+    container.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+    chip.classList.add("active");
+    refresh();
+  });
+}
+
+// ── SEARCH ────────────────────────────────────────────────────────────────────
+document.getElementById("search").addEventListener("input", refresh);
+
+// ── LOAD DATA ─────────────────────────────────────────────────────────────────
+async function loadData() {
+  try {
+    const resp = await fetch(DATA_URL);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const properties = await resp.json();
+
+    allProperties = properties;
+
+    document.getElementById("last-updated").textContent =
+      `Updated ${new Date(document.lastModified || Date.now()).toLocaleDateString()}`;
+
+    // Build marker layer
+    const markerLayer = L.layerGroup();
+    markerMap = {};
+
+    properties.forEach(p => {
+      if (!p.lat || !p.lng) return;
+      const color  = colorForType(p.deal_type);
+      const marker = L.marker([p.lat, p.lng], { icon: makeIcon(color) });
+
+      marker.bindPopup(`
+        <div class="popup-title">${p.store_name || "Unnamed"}</div>
+        <div class="popup-row">Site ID &nbsp;<span>${p.site_id}</span></div>
+        <div class="popup-row">Deal Type &nbsp;<span>${p.deal_type || "—"}</span></div>
+        <div class="popup-row">Coords &nbsp;<span>${(+p.lat).toFixed(5)}, ${(+p.lng).toFixed(5)}</span></div>
+      `);
+
+      marker.on("click", () => {
+        document.querySelectorAll(".prop-card").forEach(c => c.classList.remove("active"));
+        const card = document.querySelector(`.prop-card[data-id="${p.site_id}"]`);
+        if (card) {
+          card.classList.add("active");
+          card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        }
+      });
+
+      markerLayer.addLayer(marker);
+      markerMap[p.site_id] = marker;
+    });
+
+    registerLayer("properties", markerLayer);
+    buildChips(properties);
+    renderList(properties);
+
+    // Fit map to markers if we have any
+    const coords = properties.filter(p => p.lat && p.lng).map(p => [p.lat, p.lng]);
+    if (coords.length) map.fitBounds(coords, { padding: [40, 40] });
+
+  } catch (err) {
+    console.error("Failed to load properties.json:", err);
+    document.getElementById("property-list").innerHTML =
+      `<div style="padding:16px;color:#f77c6c;font-size:.8rem">
+        Failed to load data.<br><small>${err.message}</small>
+      </div>`;
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>
